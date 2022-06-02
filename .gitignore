@@ -1,0 +1,13 @@
+.idea
+*.log
+*.pid
+.project
+/log
+vendor
+runLock
+*.db
+/conf.php
+/composer.lock
+/run.php
+/demo
+/MyMQ.info

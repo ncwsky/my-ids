@@ -1,0 +1,186 @@
+<?php
+namespace MyId;
+/**
+ * 公共函数类库
+ * Class IdLib
+ * @package MyId
+ */
+class IdLib
+{
+    use IdMsg;
+
+    const ALARM_FAIL = 'fail';
+
+    public static $authKey = '';
+    public static $allowIp = '';
+
+    protected static $alarmInterval = 0;
+    protected static $alarmFail = 0;
+    /**
+     * @var callable|null
+     */
+    protected static $onAlarm = null;
+
+
+    public static function toJson($buffer)
+    {
+        return json_encode($buffer, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
+
+    /**
+     * 唯一id生成
+     * @param $name
+     * @return string len 20
+     */
+    public static function uniqId($name)
+    {
+        $m = microtime(true);
+        $time = floor($m);
+        $micro = $m - $time;
+        $rand = mt_rand(0, 99);
+        return (string)$time . ($name === '' ? (string)mt_rand(100, 999) : substr((string)crc32($name), -3)) . substr((string)$micro, 2, 5) . sprintf('%02d', $rand);
+    }
+
+    /**
+     * id生成(每秒最多99999个id) 最多支持部署100个服务器 每个服务最多100个进程 10位时间戳+[5位$sequence+2位$worker_id+2位$p] 19位数字  //[5位$sequence+2位uname+2位rand]
+     * @param int $worker_id 进程id 0-99
+     * @param int $p 服务器区分值 0-99
+     * @return int 8字节长整形
+     */
+    public static function bigId($worker_id = 0, $p = 0)
+    {
+        static $lastTime = 0, $sequence = 1, $uname;
+        //if (!isset($uname)) $uname = crc32(php_uname('n')) % 10 * 1000;
+        $time = time();
+        if ($time == $lastTime) {
+            $sequence++; // max 99999
+        } else {
+            $sequence = 1;
+            $lastTime = $time;
+        }
+        //$uname + mt_rand(100, 999)
+        return (int)((string)$time . '000000000') + (int)((string)$sequence . '0000') + $worker_id * 100 + $p;
+        return (int)sprintf('%d%05d%02d%02d', $time, $sequence, $worker_id, $p);
+        return $time * 1000000000 + $sequence * 10000 + $worker_id * 100 + $p;
+    }
+
+    /**
+     * 初始配置
+     */
+    public static function initConf()
+    {
+        static::$allowIp = GetC('allow_ip');
+        static::$authKey = GetC('auth_key');
+
+        static::$alarmInterval = (int)GetC('alarm_interval', 60);
+        static::$alarmFail = GetC('alarm_fail');
+        static::$onAlarm = GetC('alarm_callback');
+        if (static::$onAlarm && !is_callable(static::$onAlarm)) {
+            static::$onAlarm = null;
+        } elseif (static::$alarmFail <= 0) {
+            static::$onAlarm = null;
+        }
+    }
+
+    /**
+     * 预警触发处理
+     * @param string $type
+     * @param int $value
+     */
+    public static function alarm($type, $value)
+    {
+        if (!static::$onAlarm) return;
+
+        static $time_fail = 0;
+        $alarm = false;
+        $alarmCheck = function (&$value, &$alarmValue, &$time, &$alarm) {
+            if (is_int($value)) {
+                if ($alarmValue > 0 && $value >= $alarmValue && (IdServer::$tickTime - $time) >= static::$alarmInterval) {
+                    $time = IdServer::$tickTime;
+                    $alarm = true;
+                }
+            } elseif ((IdServer::$tickTime - $time) >= static::$alarmInterval) {
+                $time = IdServer::$tickTime;
+                $alarm = true;
+            }
+        };
+        if ($type == IdLib::ALARM_FAIL) {
+            $alarmCheck($value, static::$alarmFail, $time_fail, $alarm);
+        }
+        if ($alarm) {
+            \Log::NOTICE('alarm '. $type . ' -> ' . $value);
+            call_user_func(static::$onAlarm, $type, $value);
+        }
+    }
+
+    public static function remoteIp($con, $fd)
+    {
+        if (\SrvBase::$instance->isWorkerMan) return $con->getRemoteIp();
+
+        if (is_array($fd)) { // swoole udp 客户端信息包括address/port/server_socket等多项客户端信息数据
+            return $fd['address'];
+        }
+        return $con->getClientInfo($fd)['remote_ip'];
+    }
+
+    /**
+     * tcp 认证
+     * @param $con
+     * @param $fd
+     * @param string $recv
+     * @return bool
+     */
+    public static function auth($con, $fd, $recv = false)
+    {
+        //优先ip
+        if (IdLib::$allowIp) {
+            return \Helper::allowIp(static::remoteIp($con, $fd), IdLib::$allowIp);
+        }
+        //认证key
+        if (!IdLib::$authKey) return true;
+
+        if ($recv) {
+            if (isset(\SrvBase::$instance->auth[$fd]) && \SrvBase::$instance->auth[$fd] === true) {
+                return true;
+            }
+            if ($recv[0] == '#') {
+                $key =  substr($recv, 1);
+                if ($key == static::$authKey) { //通过认证
+                    \SrvBase::$instance->server->clearTimer(\SrvBase::$instance->auth[$fd]);
+                    \SrvBase::$instance->auth[$fd] = true;
+                } else {
+                    static::err('auth fail');
+                    return false;
+                }
+            } else {
+                static::err('not auth');
+                return false;
+            }
+            return true;
+        }
+
+        if (!isset(\SrvBase::$instance->auth)) {
+            \SrvBase::$instance->auth = [];
+        }
+
+        //连接断开清除
+        if ($recv === null) {
+            unset(\SrvBase::$instance->auth[$fd]);
+            return true;
+        }
+
+        //创建定时认证
+        \SrvBase::$instance->auth[$fd] = \SrvBase::$instance->server->after(1000, function () use ($con, $fd) {
+            unset(\SrvBase::$instance->auth[$fd]);
+            \SrvBase::safeEcho('auth timeout to close ' . $fd . PHP_EOL);
+            if (\SrvBase::$instance->isWorkerMan) {
+                //$con->send('auth timeout');
+                $con->close();
+            } else {
+                //$con->send($fd, 'auth timeout');
+                $con->close($fd);
+            }
+        });
+        return true;
+    }
+}
