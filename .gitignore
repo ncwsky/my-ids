@@ -11,3 +11,4 @@ runLock
 /run.php
 /demo
 /MyMQ.info
+/*.json

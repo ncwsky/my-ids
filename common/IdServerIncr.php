@@ -55,7 +55,6 @@ class IdServerIncr
      */
     public static function onWorkerStart($worker)
     {
-        ini_set('memory_limit', GetC('memory_limit', '512M'));
         IdLib::initConf();
 
         $is_abnormal = file_exists(\SrvBase::$instance->runDir . '/' . \SrvBase::$instance->serverName() . '.lock');
