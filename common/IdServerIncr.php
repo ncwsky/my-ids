@@ -23,11 +23,6 @@ class IdServerIncr
      * @var array
      */
     protected static $idList = [];
-    /**
-     * id下一段预载规则记录
-     * @var array
-     */
-    protected static $idPreLoadRule = [];
 
     protected static $isChange = false;
     /**
@@ -36,30 +31,20 @@ class IdServerIncr
      */
     protected static $infoStats = [];
 
-    /**User
-     *
-     *
-     * 每秒实时接收数量
+    /**
      * 每秒实时接收数量
      * @var int
      */
     protected static $realRecvNum = 0;
 
     /**
-     * @var int 定时每秒的时间
-     */
-    public static $tickTime;
-
-    /**
      * 统计信息 存储
-     * @param bool $flush
      */
     public static function info(){
-        static::$infoStats['date'] = date("Y-m-d H:i:s", static::$tickTime);
+        static::$infoStats['date'] = date("Y-m-d H:i:s", time());
         static::$infoStats['real_recv_num'] = static::$realRecvNum;
         static::$infoStats['id_list'] = static::$idList;
-
-        static::$realRecvNum = 0;
+        return static::$infoStats;
     }
 
     /**
@@ -72,16 +57,22 @@ class IdServerIncr
     {
         ini_set('memory_limit', GetC('memory_limit', '512M'));
         IdLib::initConf();
-        $time = time();
-        static::$tickTime = $time;
+
+        $is_abnormal = file_exists(\SrvBase::$instance->runDir . '/' . \SrvBase::$instance->serverName() . '.lock');
+        file_put_contents(\SrvBase::$instance->runDir . '/' . \SrvBase::$instance->serverName() . '.lock', date("Y-m-d H:i:s"));
 
         if(is_file(\SrvBase::$instance->runDir . '/' . \SrvBase::$instance->serverName() . '.json')){
             static::$idList = (array)json_decode(file_get_contents(\SrvBase::$instance->runDir . '/' . \SrvBase::$instance->serverName() . '.json'), true);
             //更新最大max_id
             foreach (static::$idList as $name => $info) {
-                static::$idList[$name]['max_id'] = $info['max_id'] + $info['step'];
-                static::$idList[$name]['last_id'] = $info['max_id'];
-                static::$idList[$name]['pro_load_id'] = static::$idPreLoadRule[$name] = $info['max_id'] + $info['pre_step'];
+                static::$idList[$name]['pre_step'] = intval(static::PRE_LOAD_RATE * $info['step']);
+                //非正常关闭的 直接使用下一段id
+                if($is_abnormal){
+                    static::$idList[$name]['max_id'] = $info['max_id'] + $info['step'];
+                    static::$idList[$name]['last_id'] = $info['max_id'];
+                    //id下一段预载规则记录
+                    static::$idList[$name]['pro_load_id'] = $info['max_id'] + $info['pre_step'];
+                }
             }
             static::$isChange = true;
         }
@@ -100,7 +91,9 @@ class IdServerIncr
      */
     public static function onWorkerStop($worker, $worker_id)
     {
-
+        static::$isChange = true;
+        static::writeToDisk();
+        unlink(\SrvBase::$instance->runDir . '/' . \SrvBase::$instance->serverName() . '.lock');
     }
 
     /**
@@ -183,7 +176,7 @@ class IdServerIncr
         if ($size < 2) return static::incrId($name);
         $idRet = '';
         for ($i = 0; $i < $size; $i++) {
-            $id = (string)static::incrId($name);
+            $id = static::incrId($name);
             if ($idRet === '') {
                 $idRet = $id;
             } else {
@@ -200,10 +193,21 @@ class IdServerIncr
      */
     protected static function incrId($name){
         static::$idList[$name]['last_id'] = static::$idList[$name]['last_id'] + static::$idList[$name]['delta'];
-        if (static::$idList[$name]['last_id'] > static::$idPreLoadRule[$name]) { //达到预载条件
+        if (static::$idList[$name]['last_id'] > static::$idList[$name]['pro_load_id']) { //达到预载条件
             static::toPreLoadId($name);
         }
-        return static::$idList[$name]['last_id'];
+        return (string)static::$idList[$name]['last_id'];
+    }
+
+    /**
+     * 预载下一段id
+     * @param $name
+     */
+    protected static function toPreLoadId($name)
+    {
+        static::$idList[$name]['pro_load_id'] = static::$idList[$name]['max_id'] + static::$idList[$name]['pre_step'];
+        static::$idList[$name]['max_id'] = static::$idList[$name]['max_id'] + static::$idList[$name]['step'];
+        static::$isChange = true;
     }
 
     /**
@@ -236,21 +240,10 @@ class IdServerIncr
         }
 
         static::$idList[$name] = ['init_id' => $init_id, 'max_id' => $max_id, 'step' => $step, 'delta' => $delta, 'last_id' => $init_id, 'pre_step'=>intval(static::PRE_LOAD_RATE * $step)];
-        static::$idList[$name]['pro_load_id'] = static::$idPreLoadRule[$name] = $init_id + static::$idList[$name]['pre_step'];
+        static::$idList[$name]['pro_load_id'] = $init_id + static::$idList[$name]['pre_step'];
         static::$isChange = true;
         static::writeToDisk();
         return static::$idList[$name];
-    }
-
-    /**
-     * 预载下一段id
-     * @param $name
-     */
-    protected static function toPreLoadId($name)
-    {
-        static::$idList[$name]['pro_load_id'] = static::$idPreLoadRule[$name] = static::$idList[$name]['max_id'] + static::$idList[$name]['pre_step'];
-        static::$idList[$name]['max_id'] = static::$idList[$name]['max_id'] + static::$idList[$name]['step'];
-        static::$isChange = true;
     }
 
     /**
@@ -258,8 +251,9 @@ class IdServerIncr
      */
     protected static function writeToDisk()
     {
+        static::$realRecvNum = 0;
         if (!static::$isChange) return;
-        file_put_contents(\SrvBase::$instance->runDir . '/' . \SrvBase::$instance->serverName() . '.json', json_encode(static::$idList), LOCK_EX | LOCK_NB);
         static::$isChange = false;
+        file_put_contents(\SrvBase::$instance->runDir . '/' . \SrvBase::$instance->serverName() . '.json', json_encode(static::$idList), LOCK_EX | LOCK_NB);
     }
 }
