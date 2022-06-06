@@ -21,7 +21,7 @@ if (!defined('VENDOR_DIR')) {
 defined('MY_PHP_DIR') || define('MY_PHP_DIR', VENDOR_DIR . '/myphps/myphp');
 //defined('MY_PHP_SRV_DIR') || define('MY_PHP_SRV_DIR', VENDOR_DIR . '/myphps/my-php-srv');
 
-defined('ID_NAME') || define('ID_NAME', 'MyIdIncr');
+defined('ID_NAME') || define('ID_NAME', 'my_id_incr');
 defined('ID_LISTEN') || define('ID_LISTEN', '0.0.0.0');
 defined('ID_PORT') || define('ID_PORT', 55012);
 defined('IS_SWOOLE') || define('IS_SWOOLE', 0);

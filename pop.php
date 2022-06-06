@@ -27,10 +27,11 @@ $client->onDecode = function ($buffer) {
 $count = 0;
 while (1) {
     try {
-        $client->send('name=test');
+        $name = ['test','abc'];
+        $client->send('name='.$name[mt_rand(0,1)].'&size=100');
         $ret = $client->recv();
         echo date("Y-m-d H:i:s") . ' recv: ' . $ret, PHP_EOL;
-        sleep(1);
+        //sleep(1);
 
         $count++;
     } catch (Exception $e) {

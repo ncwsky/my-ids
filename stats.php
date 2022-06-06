@@ -26,7 +26,11 @@ $client->onDecode = function ($buffer) {
     //$buffer = rtrim($buffer, "\n");
     return substr($buffer, 6);
 };
-$cmd && $client->send('a='.$cmd.'&name='.$name);
+$cmd = 'a=init&name=abc&init_id=0&delta=1'; //自增数
+$cmd = 'a=init&name=abc&init_id=-1&delta=2'; //奇数
+#$cmd = 'a=init&name=abc&init_id=0&delta=2'; //偶数数
+
+$cmd && $client->send($cmd);
 while (1) {
     try {
         $client->send('a=info');

@@ -174,6 +174,7 @@ class IdServerIncr
         }
         $size = isset($data['size']) ? (int)$data['size'] : 1;
         if ($size < 2) return static::incrId($name);
+        if ($size > static::DEF_STEP) $size = static::DEF_STEP;
         $idRet = '';
         for ($i = 0; $i < $size; $i++) {
             $id = static::incrId($name);
@@ -231,7 +232,6 @@ class IdServerIncr
         $init_id = isset($data['init_id']) ? (int)$data['init_id'] : 0;
         if ($step < static::MIN_STEP) $step = static::DEF_STEP;
         if ($delta < 1) $delta = 1;
-        if ($init_id < 0) $init_id = 0;
 
         $max_id = $init_id + $step;
         if ($max_id > PHP_INT_MAX) {
