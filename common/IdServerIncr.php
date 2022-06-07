@@ -44,7 +44,7 @@ class IdServerIncr
         static::$infoStats['date'] = date("Y-m-d H:i:s", time());
         static::$infoStats['real_recv_num'] = static::$realRecvNum;
         static::$infoStats['id_list'] = static::$idList;
-        return static::$infoStats;
+        return IdLib::toJson(static::$infoStats);
     }
 
     /**
@@ -209,11 +209,12 @@ class IdServerIncr
     protected static function httpSend($con, $fd, $ret){
         $code = 200;
         $reason = 'OK';
-        if ($ret===false) {
+        if ($ret === false) {
             $code = 400;
             $ret = self::err();
             $reason = 'Bad Request';
         }
+
         $body_len = strlen($ret);
         $out = "HTTP/1.1 {$code} $reason\r\nServer: my-id\r\nContent-Type: text/html;charset=utf-8\r\nContent-Length: {$body_len}\r\nConnection: keep-alive\r\n\r\n{$ret}";
         if (\SrvBase::$instance->isWorkerMan) {
@@ -226,7 +227,7 @@ class IdServerIncr
     }
     /**
      * @param $data
-     * @return string|bool|int
+     * @return string|bool
      * @throws \Exception
      */
     protected static function nextId($data){
@@ -258,7 +259,7 @@ class IdServerIncr
     /**
      * 返回自增的id
      * @param $name
-     * @return int
+     * @return string
      */
     protected static function incrId($name){
         static::$idList[$name]['last_id'] = static::$idList[$name]['last_id'] + static::$idList[$name]['delta'];
@@ -282,7 +283,7 @@ class IdServerIncr
     /**
      * 初始id信息
      * @param $data
-     * @return bool
+     * @return false|array
      */
     protected static function initId($data){
         $name = isset($data['name']) ? trim($data['name']) : '';
@@ -316,7 +317,7 @@ class IdServerIncr
         static::$idList[$name]['pro_load_id'] = $init_id + static::$idList[$name]['pre_step'];
         static::$isChange = true;
         static::writeToDisk();
-        return static::$idList[$name];
+        return IdLib::toJson(static::$idList[$name]);
     }
 
     /**
