@@ -8,6 +8,11 @@
     "require": {
         "php": ">=7.0",
         "myphps/my-php-srv": "^2.0",
-        "myphps/my-php": "^1.20"
+        "myphps/myphp": "^1.20"
+    },
+    "autoload": {
+        "psr-4": {
+            "MyId\\": "./common"
+        }
     }
 }

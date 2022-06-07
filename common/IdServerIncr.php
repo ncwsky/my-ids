@@ -57,8 +57,9 @@ class IdServerIncr
     {
         IdLib::initConf();
 
-        $is_abnormal = file_exists(\SrvBase::$instance->runDir . '/' . \SrvBase::$instance->serverName() . '.lock');
-        file_put_contents(\SrvBase::$instance->runDir . '/' . \SrvBase::$instance->serverName() . '.lock', date("Y-m-d H:i:s"));
+        $lockFile = \SrvBase::$instance->runDir . '/' . \SrvBase::$instance->serverName() . '.lock';
+        $is_abnormal = file_exists($lockFile);
+        touch($lockFile);
 
         if(is_file(\SrvBase::$instance->runDir . '/' . \SrvBase::$instance->serverName() . '.json')){
             static::$idList = (array)json_decode(file_get_contents(\SrvBase::$instance->runDir . '/' . \SrvBase::$instance->serverName() . '.json'), true);
@@ -92,7 +93,8 @@ class IdServerIncr
     {
         static::$isChange = true;
         static::writeToDisk();
-        unlink(\SrvBase::$instance->runDir . '/' . \SrvBase::$instance->serverName() . '.lock');
+        $lockFile = \SrvBase::$instance->runDir . '/' . \SrvBase::$instance->serverName() . '.lock';
+        file_exists($lockFile) && unlink($lockFile);
     }
 
     /**
@@ -107,24 +109,33 @@ class IdServerIncr
     {
         static::$realRecvNum++;
 
-        if ($recv === '') {
-            static::err('nil');
-            return false;
+        if(strncmp($recv, 'GET', 3)===0){
+            $url = substr($recv, 4, strpos($recv, ' ', 4) - 4);
+            if (!$url) {
+                static::err('URL read failed');
+                return false;
+            }
+            return static::httpGetHandle($con, $url, $fd);
         }
 
-        //if (SrvBase::$isConsole) SrvBase::safeEcho($recv . PHP_EOL);
+        \SrvBase::$isConsole && \SrvBase::safeEcho($recv . PHP_EOL);
         \Log::trace($recv);
 
-        //认证处理
-        if (!IdLib::auth($con, $fd, $recv)) {
-            static::err(IdLib::err());
-            return false;
-        }
-
-        return static::handle($con, $recv);
+        return static::handle($con, $recv, $fd);
     }
 
-    protected static function handle($con, $recv){
+    protected static function handle($con, $recv, $fd=0){
+        //认证处理
+        $authRet = IdLib::auth($con, $fd, $recv);
+        if (!$authRet) {
+            //static::err(IdLib::err());
+            IdLib::toClose($con, $fd, IdLib::err());
+            return '';
+        }
+        if($authRet==='ok'){
+            return 'ok';
+        }
+
         if ($recv[0] == '{') { // substr($recv, 0, 1) == '{' && substr($recv, -1) == '}'
             $data = json_decode($recv, true);
         } else { // querystring
@@ -149,12 +160,70 @@ class IdServerIncr
                 $ret = static::info();
                 break;
             default:
-                self::err('invalid');
+                self::err('invalid request');
                 $ret = false;
         }
         return $ret;
     }
 
+    /**
+     * @param \Workerman\Connection\TcpConnection|\swoole_server $con
+     * @param $url
+     * @param int $fd
+     * @return string
+     * @throws \Exception
+     */
+    protected static function httpGetHandle($con, $url, $fd=0){
+        $parse = parse_url($url);
+        $data = [];
+        $path = $parse['path'];
+        if(!empty($parse['query'])){
+            parse_str($parse['query'], $data);
+        }
+
+        $key = '#'.($data['key']??'nil');
+        //认证处理
+        if (!IdLib::auth($con, $fd, $key)) {
+            static::err(IdLib::err());
+            return static::httpSend($con, $fd, false);
+        }
+
+        $ret = 'ok'; //默认返回信息
+        switch ($path) {
+            case '/id': //入列 用于消息重试
+                $ret = static::nextId($data);
+                break;
+            case '/init':
+                $ret = static::initId($data);
+                break;
+            case '/info':
+                $ret = static::info();
+                break;
+            default:
+                self::err('Invalid Request');
+                $ret = false;
+        }
+
+        return static::httpSend($con, $fd, $ret);
+    }
+    protected static function httpSend($con, $fd, $ret){
+        $code = 200;
+        $reason = 'OK';
+        if ($ret===false) {
+            $code = 400;
+            $ret = self::err();
+            $reason = 'Bad Request';
+        }
+        $body_len = strlen($ret);
+        $out = "HTTP/1.1 {$code} $reason\r\nServer: my-id\r\nContent-Type: text/html;charset=utf-8\r\nContent-Length: {$body_len}\r\nConnection: keep-alive\r\n\r\n{$ret}";
+        if (\SrvBase::$instance->isWorkerMan) {
+            $con->close($out);
+        } else {
+            $con->send($fd, \MyId\IdPackEof::encode($out));
+            $con->close($fd);
+        }
+        return '';
+    }
     /**
      * @param $data
      * @return string|bool|int
@@ -163,12 +232,12 @@ class IdServerIncr
     protected static function nextId($data){
         $name = isset($data['name']) ? trim($data['name']) : '';
         if (!$name) {
-            self::err('name无效');
+            self::err('Invalid ID name');
             return false;
         }
         $name = strtolower($name);
         if (!isset(static::$idList[$name])) {
-            self::err('name不存在');
+            self::err('ID name does not exist');
             return false;
         }
         $size = isset($data['size']) ? (int)$data['size'] : 1;
@@ -226,6 +295,11 @@ class IdServerIncr
             self::err('已存在此Id name');
             return false;
         }
+        if(count(static::$idList)>=1024){
+            self::err('已超出可设置id数');
+            return false;
+        }
+
         $step = isset($data['step']) ? (int)$data['step'] : static::DEF_STEP;
         $delta = isset($data['delta']) ? (int)$data['delta'] : 1;
         $init_id = isset($data['init_id']) ? (int)$data['init_id'] : 0;

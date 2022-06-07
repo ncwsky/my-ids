@@ -120,7 +120,7 @@ class IdServerIncr
             return false;
         }
 
-        //if (SrvBase::$isConsole) SrvBase::safeEcho($recv . PHP_EOL);
+        \SrvBase::$isConsole && \SrvBase::safeEcho($recv . PHP_EOL);
         \Log::trace($recv);
 
         //认证处理

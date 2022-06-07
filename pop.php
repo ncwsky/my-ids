@@ -14,17 +14,14 @@ $host = GetOpt::val('h', 'host', '192.168.0.245:55012');
 if ($testCount <= 0) $testCount = 0;
 
 $client = TcpClient::instance();
-$client->config('192.168.0.245:55012');
-$client->onInput = function ($buffer) {
-    return \MyId\IdPackN2::input($buffer);
-};
-$client->onEncode = function ($buffer) {
-    return \MyId\IdPackN2::toEncode($buffer);
-};
-$client->onDecode = function ($buffer) {
-    return substr($buffer, 6);
-};
+$client->config($host);
+$client->packageEof = "\r\n";
 $count = 0;
+//认证
+$client->onConnect = function ($client){
+    $client->send('#123456');
+    $client->recv();
+};
 while (1) {
     try {
         $name = ['test','abc'];

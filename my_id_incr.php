@@ -27,9 +27,9 @@ defined('ID_PORT') || define('ID_PORT', 55012);
 defined('IS_SWOOLE') || define('IS_SWOOLE', 0);
 defined('STOP_TIMEOUT') || define('STOP_TIMEOUT', 10); //进程结束超时时间 秒
 
-require VENDOR_DIR . '/autoload.php';
-require MY_PHP_DIR . '/GetOpt.php';
-defined('MY_PHP_SRV_DIR') && require MY_PHP_SRV_DIR . '/Load.php';
+require_once VENDOR_DIR . '/autoload.php';
+require_once MY_PHP_DIR . '/GetOpt.php';
+defined('MY_PHP_SRV_DIR') && require_once MY_PHP_SRV_DIR . '/Load.php';
 
 //解析命令参数
 GetOpt::parse('sp:l:', ['help', 'swoole', 'port:', 'listen:']);
@@ -61,24 +61,16 @@ $conf = [
     'name' => ID_NAME, //服务名
     'ip' => $listen,
     'port' => $port,
-    'type' => 'tcp', //类型[tcp udp]
+    'type' => 'tcp', //类型[tcp http]
     'setting' => [ //swooleSrv有兼容处理
-        'protocol' => '\MyId\IdPackN2',
+        'protocol' => '\MyId\IdPackEof',
         'stdoutFile' => RUN_DIR . '/log.log', //终端输出
         'pidFile' => RUN_DIR . '/mq.pid',  //pid_file
         'logFile' => RUN_DIR . '/log.log', //日志文件 log_file
         'log_level' => 4,
-        'open_length_check' => true,
-        'package_length_func' => function ($buffer) { //自定义解析长度
-            if (strlen($buffer) < 6) {
-                return 0;
-            }
-            $unpack_data = unpack('Cnull/Ntotal_length/Cstart', $buffer);
-            if ($unpack_data['null'] !== 0x00 || $unpack_data['start'] !== 0x02) {
-                return 0;
-            }
-            return $unpack_data['total_length'];
-        }
+        'open_eof_check' => true,
+        'open_eof_split' => true,
+        'package_eof' => "\n"
     ],
     'event' => [
         'onWorkerStart' => function ($worker, $worker_id) {
@@ -91,15 +83,23 @@ $conf = [
             if (!$isSwoole) {
                 $fd = $con->id;
             }
-            \MyId\IdLib::auth($con, $fd);
+            \SrvBase::$isConsole && SrvBase::safeEcho('onConnect '.$fd.PHP_EOL);
+
+            if(!\MyId\IdLib::auth($con, $fd)){
+                \MyId\IdLib::toClose($con, $fd);
+            }
         },
-        'onClose' => function ($con, $fd = 0) {
-            \MyId\IdLib::auth($con, $fd, null);
+        'onClose' => function ($con, $fd = 0) use ($isSwoole) {
+            if (!$isSwoole) {
+                $fd = $con->id;
+            }
+            \MyId\IdLib::auth($con, $fd, false);
+            \SrvBase::$isConsole && SrvBase::safeEcho(date("Y-m-d H:i:s ").microtime(true).' onClose '.$fd.PHP_EOL);
         },
         'onReceive' => function (swoole_server $server, int $fd, int $reactor_id, string $data) { //swoole tcp
-            $data = \MyId\IdPackN2::decode($data);
+            $data = \MyId\IdPackEof::decode($data);
             $ret = \MyId\IdServerIncr::onReceive($server, $data, $fd);
-            $server->send($fd, \MyId\IdPackN2::encode($ret !== false ? $ret : \MyId\IdServerIncr::err()));
+            $server->send($fd, \MyId\IdPackEof::encode($ret !== false ? $ret : \MyId\IdServerIncr::err()));
         },
         'onMessage' => function (\Workerman\Connection\ConnectionInterface $connection, $data) { //workerman
             $fd = $connection->id;
