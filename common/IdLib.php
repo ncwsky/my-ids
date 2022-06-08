@@ -132,6 +132,13 @@ class IdLib
      */
     public static function auth($con, $fd, $recv = null)
     {
+        //优先ip
+        if (static::$allowIp) {
+            return $recv === false || \Helper::allowIp(static::remoteIp($con, $fd), static::$allowIp);
+        }
+        //认证key
+        if (!static::$authKey) return true;
+
         if (!isset(\SrvBase::$instance->auth)) {
             \SrvBase::$instance->auth = [];
         }
@@ -143,28 +150,15 @@ class IdLib
             return true;
         }
 
-        //优先ip
-        if (static::$allowIp) {
-            return \Helper::allowIp(static::remoteIp($con, $fd), static::$allowIp);
-        }
-        //认证key
-        if (!static::$authKey) return true;
-
         if ($recv) {
             if (isset(\SrvBase::$instance->auth[$fd]) && \SrvBase::$instance->auth[$fd] === true) {
                 return true;
             }
             \SrvBase::$instance->server->clearTimer(\SrvBase::$instance->auth[$fd]);
-            if ($recv[0] == '#') {
-                $key =  substr($recv, 1);
-                if ($key == static::$authKey) { //通过认证
-                    \SrvBase::$instance->auth[$fd] = true;
-                } else {
-                    static::err('auth fail');
-                    return false;
-                }
+            if ($recv == static::$authKey) { //通过认证
+                \SrvBase::$instance->auth[$fd] = true;
             } else {
-                static::err('not auth');
+                static::err('auth fail');
                 return false;
             }
             return 'ok';

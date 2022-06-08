@@ -19,7 +19,7 @@ $client->packageEof = "\r\n";
 $count = 0;
 //认证
 $client->onConnect = function ($client){
-    $client->send('#123456');
+    $client->send('123456');
     $client->recv();
 };
 while (1) {

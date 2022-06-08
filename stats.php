@@ -6,6 +6,8 @@ require __DIR__ . '/conf.php';
 require __DIR__ . '/../myphp/base.php';
 require __DIR__ . '/../myphp/GetOpt.php';
 
+//$curl = Http::doGet('http://192.168.0.245:55012/init?name=conf&size=10&key=123456');
+//var_dump($curl);die();
 //解析命令参数
 GetOpt::parse('h:c:n:', ['host:', 'cmd:', 'name:']);
 $cmd =GetOpt::val('c', 'cmd');
@@ -19,7 +21,7 @@ $client->packageEof = "\r\n";
 #$cmd = 'a=init&name=abc&init_id=0&delta=2'; //偶数数
 //认证
 $client->onConnect = function ($client){
-    $client->send('#123456');
+    $client->send('123456');
     $client->recv();
 };
 $cmd && $client->send($cmd);

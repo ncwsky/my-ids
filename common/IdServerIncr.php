@@ -10,11 +10,21 @@ class IdServerIncr
 {
     use IdMsg;
 
+    //错误提示设置或读取
+    public static function err($msg=null, $code=1){
+        if ($msg === null) {
+            return self::$myMsg;
+        } else {
+            self::msg('-'.$msg, $code);
+        }
+    }
+
     const MAX_UNSIGNED_INT = 4294967295;
     const MAX_INT = 2147483647;
     const MAX_UNSIGNED_BIG_INT = 18446744073709551615;
     const MAX_BIG_INT = 9223372036854775807;
 
+    const ALLOW_ID_NUM = 256; //允许的id数量
     const DEF_STEP = 1000; //默认步长
     const MIN_STEP = 100; //最小步长
     const PRE_LOAD_RATE = 0.2; //下一段id预载比率
@@ -181,9 +191,8 @@ class IdServerIncr
             parse_str($parse['query'], $data);
         }
 
-        $key = '#'.($data['key']??'nil');
         //认证处理
-        if (!IdLib::auth($con, $fd, $key)) {
+        if (!IdLib::auth($con, $fd, $data['key']??'nil')) {
             static::err(IdLib::err());
             return static::httpSend($con, $fd, false);
         }
@@ -288,15 +297,15 @@ class IdServerIncr
     protected static function initId($data){
         $name = isset($data['name']) ? trim($data['name']) : '';
         if (!$name) {
-            self::err('name无效');
+            self::err('Invalid ID name');
             return false;
         }
         $name = strtolower($name);
         if (isset(static::$idList[$name])) {
-            self::err('已存在此Id name');
+            self::err('This ID name already exists');
             return false;
         }
-        if(count(static::$idList)>=1024){
+        if (count(static::$idList) >= static::ALLOW_ID_NUM) {
             self::err('已超出可设置id数');
             return false;
         }
