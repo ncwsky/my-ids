@@ -16,27 +16,44 @@ if ($testCount <= 0) $testCount = 0;
 $client = TcpClient::instance();
 $client->config($host);
 $client->packageEof = "\r\n";
-$count = 0;
+$run_times = 0;
 //认证
 $client->onConnect = function ($client){
     $client->send('123456');
     $client->recv();
 };
+$name = 'id_abcd';
+$cmd = 'a=init&name='.$name.'&init_id=0&delta=1'; //自增数
+if($cmd && $client->send($cmd)){
+    echo $client->recv().PHP_EOL;
+}
+
 while (1) {
     try {
-        $names = ['test','abc'];
-        $name = $names[mt_rand(0,1)];
-        $client->send('name='.$name.'&size=1');
+        $client->send('name='.$name.'&size='.mt_rand(0, 1000));
         $ret = $client->recv();
         echo date("Y-m-d H:i:s") . ' recv['.$name.']: ' . $ret, PHP_EOL;
         //sleep(1);
-
-        $count++;
+        if(strpos($ret, ',')){
+            $idList = explode(',', $ret);
+        }else{
+            $idList = [$ret];
+        }
+        $count = 0;
+        $real_count = count($idList);
+        db()->beginTrans();
+        foreach ($idList as $id){
+            db()->add(['id'=>$id], 'test');
+            $count++;
+        }
+        db()->commit();
+        echo 'real_count:'. $real_count .', count: '.$count.' ---------------------------'.PHP_EOL;
+        $run_times++;
     } catch (Exception $e) {
         echo date("Y-m-d H:i:s") . ' err: ' . $e->getMessage(), PHP_EOL;
-        sleep(2);
+        break;
     }
-    if ($testCount && $count >= $testCount) {
+    if ($testCount && $run_times >= $testCount) {
         break;
     }
 }

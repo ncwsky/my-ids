@@ -7,8 +7,8 @@ use `myid`;
 CREATE TABLE `id_list` (
   `id` int NOT NULL AUTO_INCREMENT,
   `name` varchar(32) NOT NULL,
-  `init_id` bigint(20) DEFAULT '0',
-  `max_id` bigint(20) NOT NULL DEFAULT '0',
+  `init_id` bigint DEFAULT '0',
+  `max_id` bigint DEFAULT '0',
   `step` int DEFAULT '0' COMMENT '步长',
   `delta` int DEFAULT '1' COMMENT '每次增量值',
   `ctime` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',

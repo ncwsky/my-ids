@@ -9,8 +9,6 @@ class IdLib
 {
     use IdMsg;
 
-    const ALARM_FAIL = 'fail';
-
     public static $authKey = '';
     public static $allowIp = '';
 
@@ -79,37 +77,6 @@ class IdLib
             static::$onAlarm = null;
         } elseif (static::$alarmFail <= 0) {
             static::$onAlarm = null;
-        }
-    }
-
-    /**
-     * 预警触发处理
-     * @param string $type
-     * @param int $value
-     */
-    public static function alarm($type, $value)
-    {
-        if (!static::$onAlarm) return;
-
-        static $time_fail = 0;
-        $alarm = false;
-        $alarmCheck = function (&$value, &$alarmValue, &$time, &$alarm) {
-            if (is_int($value)) {
-                if ($alarmValue > 0 && $value >= $alarmValue && (IdServer::$tickTime - $time) >= static::$alarmInterval) {
-                    $time = IdServer::$tickTime;
-                    $alarm = true;
-                }
-            } elseif ((IdServer::$tickTime - $time) >= static::$alarmInterval) {
-                $time = IdServer::$tickTime;
-                $alarm = true;
-            }
-        };
-        if ($type == IdLib::ALARM_FAIL) {
-            $alarmCheck($value, static::$alarmFail, $time_fail, $alarm);
-        }
-        if ($alarm) {
-            \Log::NOTICE('alarm '. $type . ' -> ' . $value);
-            call_user_func(static::$onAlarm, $type, $value);
         }
     }
 

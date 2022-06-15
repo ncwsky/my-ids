@@ -63,7 +63,7 @@ class IdServerIncr
      * @param $worker_id
      * @throws \Exception
      */
-    public static function onWorkerStart($worker)
+    public static function onWorkerStart($worker, $worker_id)
     {
         IdLib::initConf();
 
