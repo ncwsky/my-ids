@@ -25,7 +25,7 @@ defined('ID_NAME') || define('ID_NAME', 'my_id');
 defined('ID_LISTEN') || define('ID_LISTEN', '0.0.0.0');
 defined('ID_PORT') || define('ID_PORT', 55012);
 defined('IS_SWOOLE') || define('IS_SWOOLE', 0);
-defined('ID_WORKER_NUM') || define('ID_WORKER_NUM', 10);
+defined('ID_WORKER_NUM') || define('ID_WORKER_NUM', 8);
 
 require_once VENDOR_DIR . '/autoload.php';
 require_once MY_PHP_DIR . '/GetOpt.php';

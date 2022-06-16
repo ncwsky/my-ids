@@ -12,3 +12,4 @@ runLock
 /demo
 /MyMQ.info
 /*.json
+/run.incr.php

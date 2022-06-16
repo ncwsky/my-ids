@@ -25,8 +25,8 @@ class IdServer
     const MAX_BIG_INT = 9223372036854775807;
 
     const ALLOW_ID_NUM = 256; //允许的id数量
-    const DEF_STEP = 1000; //默认步长
-    const MIN_STEP = 100; //最小步长
+    const DEF_STEP = 5000; //默认步长
+    const MIN_STEP = 1000; //最小步长
     const PRE_LOAD_RATE = 0.2; //下一段id预载比率
     /**
      * id列表记录  ['name'=>[init_id,max_id,step,delta], ...]
@@ -51,6 +51,7 @@ class IdServer
      * 统计信息 存储
      */
     public static function info(){
+        //todo 多进程信息采集
         static::$infoStats['date'] = date("Y-m-d H:i:s", time());
         static::$infoStats['real_recv_num'] = static::$realRecvNum;
         static::$infoStats['id_list'] = static::$idList;
@@ -339,7 +340,7 @@ class IdServer
         //数据库再次验证
         $info = db()->table('id_list')->fields('id')->where(['name'=>$name])->one();
         if($info){
-            self::err('This ID name already exists');
+            self::err('This ID name already exists.');
             return false;
         }
 
