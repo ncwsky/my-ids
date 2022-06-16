@@ -26,3 +26,12 @@ ID生成服务
     修改 run.php conf.php配置
     运行 ./run.php 
     
+###使用
+>http模式 
+
+    获取id /id?name=xxx[&size=x]
+    初始id /init?name=xxx[&delta=1&step=1000&init_id=0]
+>tcp模式  
+
+    获取id 发送 name=xx[&size=x]+"\r\n" 
+    初始id 发送 a=init&name=xxx[&delta=1&step=1000&init_id=0]+"\r\n" 
