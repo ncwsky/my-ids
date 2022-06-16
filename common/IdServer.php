@@ -73,9 +73,9 @@ class IdServer
         }
 
         //n ms实时数据落地
-        $worker->tick(1000, function () use($worker_id){
+/*        $worker->tick(1000, function () use($worker_id){
             static::writeToDisk($worker_id);
-        });
+        });*/
     }
 
     /**
@@ -260,15 +260,18 @@ class IdServer
      */
     protected static function incrId($name){
         static::$idList[$name]['last_id'] = static::$idList[$name]['last_id'] + static::$idList[$name]['delta'];
-        //达到本id段最大值 切换到下一已预载的id段 id值并重置为新的
-        if (static::$idList[$name]['last_id'] > static::$idList[$name]['max_id']) {
-            static::$idList[$name]['max_id'] = static::$idList[$name]['next_max_id'];
-            static::$idList[$name]['last_id'] = static::$idList[$name]['max_id'] + static::$idList[$name]['init_id'] + static::$idList[$name]['delta'];
-        }
+
         //达到预载条件
         if (static::$idList[$name]['last_id'] > static::$idList[$name]['pro_load_id']) {
             static::toPreLoadId($name);
         }
+
+        //达到本id段最大值 切换到下一已预载的id段 id值并重置为新的
+        if (static::$idList[$name]['last_id'] > static::$idList[$name]['max_id']) {
+            static::$idList[$name]['max_id'] = static::$idList[$name]['next_max_id'];
+            static::$idList[$name]['last_id'] = (static::$idList[$name]['max_id'] - static::$idList[$name]['step']) + static::$idList[$name]['init_id'] + static::$idList[$name]['delta'];
+        }
+
         return (string)static::$idList[$name]['last_id'];
     }
 
@@ -285,11 +288,13 @@ class IdServer
         //预载下段id最大值
         $next_max_id = $info['max_id'] + $info['step'];
         //更新数据
-        db()->update(['max_id' => $next_max_id, 'mtime' => time()], 'id_list', ['id' => $info['id']]);
+        db()->update(['max_id' => $next_max_id, 'mtime' => date('Y-m-d H:i:s')], 'id_list', ['id' => $info['id']]);
         db()->commit();
+        //echo 'toPreLoadId-before['.$name.']'.json_encode(static::$idList[$name]).PHP_EOL;
 
         static::$idList[$name]['pro_load_id'] = $pro_load_id;
         static::$idList[$name]['next_max_id'] = $next_max_id;
+        //echo 'toPreLoadId-after ['.$name.']'. json_encode(static::$idList[$name]).PHP_EOL;
     }
 
     /**
@@ -307,8 +312,9 @@ class IdServer
         //更新max_id
         $info['next_max_id'] = $info['max_id'] = $info['max_id'] + $info['step'];
         //更新数据
-        db()->update(['max_id' => $info['max_id'], 'mtime' => time()], 'id_list', ['name'=>$name]);
+        db()->update(['max_id' => $info['max_id'], 'mtime' => date('Y-m-d H:i:s')], 'id_list', ['name'=>$name]);
         db()->commit();
+        //echo 'toLoadId['.$name.']:'.json_encode($info).PHP_EOL;
 
         unset($info['name']);
         static::$idList[$name] = $info;
@@ -357,7 +363,7 @@ class IdServer
 
         $data = $info = ['init_id' => $init_id, 'max_id' => $max_id, 'step' => $step, 'delta' => $delta];
         $data['name'] = $name;
-        $data['mtime'] = $data['ctime'] = time();
+        $data['mtime'] = $data['ctime'] = date('Y-m-d H:i:s');
 
         try{
             db()->add($data, 'id_list');
@@ -382,7 +388,9 @@ class IdServer
         if(!is_dir($dir)){
             mkdir($dir, 0777, true);
         }
-        static::$realRecvNum = 0;
         // 这里可考虑把每个进程的信息记录到相应进程id的文件 用于信息输出
+        //file_put_contents($dir . '/' . $worker_id . '.json', '', LOCK_EX | LOCK_NB);
+        static::$realRecvNum = 0;
+
     }
 }

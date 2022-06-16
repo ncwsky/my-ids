@@ -10,7 +10,7 @@ require __DIR__ . '/../myphp/GetOpt.php';
 //解析命令参数
 GetOpt::parse('h:n:', ['host:', 'num:']);
 $testCount = (int)GetOpt::val('n', 'num', 0);
-$host = GetOpt::val('h', 'host', '192.168.0.245:55012');
+$host = GetOpt::val('h', 'host', '192.168.0.245:55013');
 if ($testCount <= 0) $testCount = 0;
 
 $client = TcpClient::instance();
@@ -32,7 +32,7 @@ while (1) {
     try {
         $client->send('name='.$name.'&size='.mt_rand(0, 1000));
         $ret = $client->recv();
-        echo date("Y-m-d H:i:s") . ' recv['.$name.']: ' . $ret, PHP_EOL;
+        //echo date("Y-m-d H:i:s") . ' recv['.$name.']: ' . $ret, PHP_EOL;
         //sleep(1);
         if(strpos($ret, ',')){
             $idList = explode(',', $ret);
