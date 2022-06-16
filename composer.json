@@ -1,9 +1,9 @@
 {
     "name": "myphps/my-id",
-    "description": "id生成器 分布式id生成服务",
+    "description": "id生成服务",
     "license": "MIT",
     "keywords": ["id"],
-    "homepage": "https://github.com/myphps/my-id",
+    "homepage": "https://github.com/ncwsky/my-id",
     "minimum-stability": "dev",
     "require": {
         "php": ">=7.0",
