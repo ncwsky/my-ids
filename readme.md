@@ -14,15 +14,15 @@ ID生成服务
     mkdir myid
     cd myid
     
-    composer require myphps/mq-id
+    composer require myphps/my-id
     
     //单进程ID生成服务 可保持id自增特性 
-    cp vendor/myphps/mq-id/run.incr.example.php run.incr.php
+    cp vendor/myphps/my-id/run.incr.example.php run.incr.php
     
     //多进程ID生成服务 趋势递增的id，即不保证下一个id一定比上一个大 
-    cp vendor/myphps/mq-id/run.example.php run.php
+    cp vendor/myphps/my-id/run.example.php run.php
         
-    cp vendor/myphps/mq-id/conf.example.php conf.php
+    cp vendor/myphps/my-id/conf.example.php conf.php
     chmod +x run.php
     
     修改 run.php conf.php配置
