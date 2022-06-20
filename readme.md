@@ -10,7 +10,9 @@ ID生成服务
 多进程ID生成服务 使用mysql记录id数据 使用mysql.sql创建id存储库
 
 ###安装
+    
     mkdir myid
+    cd myid
     
     composer require myphps/mq-id
     
