@@ -25,7 +25,7 @@ class IdServerIncr
     const MAX_BIG_INT = 9223372036854775807;
 
     const ALLOW_ID_NUM = 256; //允许的id数量
-    const DEF_STEP = 10000; //默认步长
+    const DEF_STEP = 100000; //默认步长
     const MIN_STEP = 1000; //最小步长
     const PRE_LOAD_RATE = 0.2; //下一段id预载比率
     /**
@@ -166,6 +166,9 @@ class IdServerIncr
             case 'init':
                 $ret = static::initId($data);
                 break;
+            case 'update':
+                $ret = static::updateId($data);
+                break;
             case 'info':
                 $ret = static::info();
                 break;
@@ -205,6 +208,9 @@ class IdServerIncr
             case '/init':
                 $ret = static::initId($data);
                 break;
+            case '/update':
+                $ret = static::updateId($data);
+                break;
             case '/info':
                 $ret = static::info();
                 break;
@@ -233,6 +239,15 @@ class IdServerIncr
             $con->close($fd);
         }
         return '';
+    }
+
+    protected static function idName(&$data)
+    {
+        $name = isset($data['name']) ? trim($data['name']) : '';
+        if (!$name) {
+            return false;
+        }
+        return strtolower($name);
     }
     /**
      * @param $data
@@ -318,7 +333,7 @@ class IdServerIncr
 
         $max_id = $init_id + $step;
         if ($max_id > PHP_INT_MAX) {
-            self::err('初始数据无效，已超出最大值限制！');
+            self::err('Invalid max_id['. $max_id .']!');
             return false;
         }
 
@@ -329,6 +344,62 @@ class IdServerIncr
         return IdLib::toJson(static::$idList[$name]);
     }
 
+    /**
+     * 更新id信息
+     * @param $data
+     * @return bool|false|string
+     */
+    protected static function updateId($data){
+        $name = isset($data['name']) ? trim($data['name']) : '';
+        if (!$name) {
+            self::err('Invalid ID name');
+            return false;
+        }
+        $name = strtolower($name);
+        if (!isset(static::$idList[$name])) {
+            self::err('ID name does not exist');
+            return false;
+        }
+
+        $max_id = 0;
+        $step = isset($data['step']) ? (int)$data['step'] : 0;
+        $delta = isset($data['delta']) ? (int)$data['delta'] : 0;
+        $init_id = isset($data['init_id']) ? (int)$data['init_id'] : 0;
+        if ($step < static::MIN_STEP) {
+            $step = 0;
+        }
+        if ($delta < 1) {
+            $delta = 0;
+        }
+        if ($init_id > 0 && $init_id < static::$idList[$name]['last_id']) {
+            self::err('Invalid init_id[' . $init_id . ']!');
+            return false;
+            $init_id = 0;
+        }
+
+        if ($init_id > 0) {
+            $max_id = $init_id + ($step > 0 ? $step : static::$idList[$name]['step']);
+            if ($max_id > PHP_INT_MAX) {
+                self::err('Invalid max_id['. $max_id .']!');
+                return false;
+            }
+        }
+        if ($step > 0) {
+            static::$idList[$name]['step'] = $step;
+            static::$idList[$name]['pre_step'] = intval(static::PRE_LOAD_RATE * $step);
+        }
+        if ($max_id > 0) static::$idList[$name]['max_id'] = $max_id;
+        if ($delta > 0) static::$idList[$name]['delta'] = $delta;
+        if ($init_id > 0) {
+            static::$idList[$name]['init_id'] = $init_id;
+            static::$idList[$name]['last_id'] = $init_id;
+            static::$idList[$name]['pro_load_id'] = $init_id + static::$idList[$name]['pre_step'];
+        }
+
+        static::$isChange = true;
+        static::writeToDisk();
+        return IdLib::toJson(static::$idList[$name]);
+    }
     /**
      * 将数据写入磁盘
      */
