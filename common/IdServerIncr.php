@@ -241,26 +241,17 @@ class IdServerIncr
         return '';
     }
 
-    protected static function idName(&$data)
-    {
-        $name = isset($data['name']) ? trim($data['name']) : '';
-        if (!$name) {
-            return false;
-        }
-        return strtolower($name);
-    }
     /**
      * @param $data
      * @return string|bool
      * @throws \Exception
      */
     protected static function nextId($data){
-        $name = isset($data['name']) ? trim($data['name']) : '';
-        if (!$name) {
+        if (empty($data['name'])) {
             self::err('Invalid ID name');
             return false;
         }
-        $name = strtolower($name);
+        $name = strtolower($data['name']);
         if (!isset(static::$idList[$name])) {
             self::err('ID name does not exist');
             return false;
@@ -350,12 +341,11 @@ class IdServerIncr
      * @return bool|false|string
      */
     protected static function updateId($data){
-        $name = isset($data['name']) ? trim($data['name']) : '';
-        if (!$name) {
+        if (empty($data['name'])) {
             self::err('Invalid ID name');
             return false;
         }
-        $name = strtolower($name);
+        $name = strtolower($data['name']);
         if (!isset(static::$idList[$name])) {
             self::err('ID name does not exist');
             return false;
