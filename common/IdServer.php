@@ -223,12 +223,11 @@ class IdServer
      * @throws \Exception
      */
     protected static function nextId($data){
-        $name = isset($data['name']) ? trim($data['name']) : '';
-        if (!$name) {
+        if (empty($data['name'])) {
             self::err('Invalid ID name');
             return false;
         }
-        $name = strtolower($name);
+        $name = strtolower($data['name']);
         if (!isset(static::$idList[$name])) {
             //有新增但其他进程未记录 查询验证并记录
             $one = db()->table('id_list')->fields('name')->where(['name'=>$name])->one();

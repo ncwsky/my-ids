@@ -5,6 +5,8 @@ ID生成服务
 >支持生成奇偶的id  
 >支付http+tcp接入
 
+TODO    
+>多进程增加变更id 通知其他进程同步更新
 
 单进程ID生成服务 使用json文件记录id数据    
 多进程ID生成服务 使用mysql记录id数据 使用mysql.sql创建id存储库
