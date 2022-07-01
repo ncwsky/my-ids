@@ -57,6 +57,10 @@ class IdServerIncr
         return IdLib::toJson(static::$infoStats);
     }
 
+    protected static function jsonFileName(){
+        return \SrvBase::$instance->runDir . '/.' . \SrvBase::$instance->serverName().'.json';
+    }
+
     /**
      * 进程启动时处理
      * @param $worker
@@ -71,8 +75,8 @@ class IdServerIncr
         $is_abnormal = file_exists($lockFile);
         touch($lockFile);
 
-        if(is_file(\SrvBase::$instance->runDir . '/' . \SrvBase::$instance->serverName() . '.json')){
-            static::$idList = (array)json_decode(file_get_contents(\SrvBase::$instance->runDir . '/' . \SrvBase::$instance->serverName() . '.json'), true);
+        if(is_file(static::jsonFileName())){
+            static::$idList = (array)json_decode(file_get_contents(static::jsonFileName()), true);
             //更新最大max_id
             foreach (static::$idList as $name => $info) {
                 static::$idList[$name]['pre_step'] = intval(static::PRE_LOAD_RATE * $info['step']);
@@ -398,6 +402,6 @@ class IdServerIncr
         static::$realRecvNum = 0;
         if (!static::$isChange) return;
         static::$isChange = false;
-        file_put_contents(\SrvBase::$instance->runDir . '/' . \SrvBase::$instance->serverName() . '.json', json_encode(static::$idList), LOCK_EX | LOCK_NB);
+        file_put_contents(static::jsonFileName(), json_encode(static::$idList), LOCK_EX | LOCK_NB);
     }
 }
