@@ -69,7 +69,7 @@ $conf = [
         'log_level' => 4,
         'open_eof_check' => true,
         'open_eof_split' => true,
-        'package_eof' => "\n"
+        'package_eof' => "\r\n"
     ],
     'event' => [
         'onWorkerStart' => function ($worker, $worker_id) {

@@ -14,13 +14,8 @@ class IdPackEof
      * @param string $buffer
      * @return int
      */
-    public static function input($buffer, ConnectionInterface $connection)
+    public static function input($buffer)
     {
-        // Judge whether the package length exceeds the limit.
-        if (isset($connection->maxPackageSize) && \strlen($buffer) >= $connection->maxPackageSize) {
-            $connection->close();
-            return 0;
-        }
         //  Find the position of  "\n".
         $pos = \strpos($buffer, "\n");
         // No "\n", packet length is unknown, continue to wait for the data so return 0.
