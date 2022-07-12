@@ -123,7 +123,7 @@ class IdServerIncr
     {
         static::$realRecvNum++;
 
-        if(strncmp($recv, 'GET', 3)===0){
+        if(substr($recv, 0, 3)==='GET'){
             $url = substr($recv, 4, strpos($recv, ' ', 4) - 4);
             if (!$url) {
                 static::err('URL read failed');
@@ -219,7 +219,7 @@ class IdServerIncr
                 $ret = static::info();
                 break;
             default:
-                self::err('Invalid Request');
+                self::err('Invalid Request '.$path);
                 $ret = false;
         }
 

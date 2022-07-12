@@ -1,7 +1,7 @@
 <?php
 namespace MyId;
 
-use Workerman\Connection\ConnectionInterface;
+use Workerman\Connection\TcpConnection;
 
 /**
  * LogPackN2 Protocol.
@@ -12,17 +12,26 @@ class IdPackEof
      * Check the integrity of the package.
      *
      * @param string $buffer
+     * @param TcpConnection $connection
      * @return int
      */
-    public static function input($buffer)
+    public static function input($buffer, TcpConnection $connection)
     {
-        //  Find the position of  "\n".
+        if(substr($buffer, 0, 3)==='GET'){
+            $pos = \strpos($buffer, "\r\n\r\n");
+            if ($pos === false) {
+                if ($recv_len = \strlen($buffer) >= 16384) { //url接受最大的长度为16384个字符
+                    $connection->close("HTTP/1.1 413 Request Entity Too Large\r\n\r\n");
+                    return 0;
+                }
+                return 0;
+            }
+            return $pos + 4;
+        }
         $pos = \strpos($buffer, "\n");
-        // No "\n", packet length is unknown, continue to wait for the data so return 0.
         if ($pos === false) {
             return 0;
         }
-        // Return the current package length.
         return $pos + 1;
     }
 

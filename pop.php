@@ -29,7 +29,7 @@ while (1) {
         $client->send('name='.$name.'&size=1');
         $ret = $client->recv();
         echo date("Y-m-d H:i:s") . ' recv['.$name.']: ' . $ret, PHP_EOL;
-        //sleep(1);
+        sleep(1);
 
         $count++;
     } catch (Exception $e) {

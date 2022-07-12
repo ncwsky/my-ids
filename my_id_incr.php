@@ -25,6 +25,7 @@ defined('ID_NAME') || define('ID_NAME', 'my_id_incr');
 defined('ID_LISTEN') || define('ID_LISTEN', '0.0.0.0');
 defined('ID_PORT') || define('ID_PORT', 55012);
 defined('IS_SWOOLE') || define('IS_SWOOLE', 0);
+defined('MAX_INPUT_SIZE') || define('MAX_INPUT_SIZE', 65536); //接收包限制大小64k
 
 require_once VENDOR_DIR . '/autoload.php';
 require_once MY_PHP_DIR . '/GetOpt.php';
@@ -62,14 +63,31 @@ $conf = [
     'port' => $port,
     'type' => 'tcp', //类型[tcp http]
     'setting' => [ //swooleSrv有兼容处理
+        'count' => 1, //单进程模式
         'protocol' => '\MyId\IdPackEof',
         'stdoutFile' => RUN_DIR . '/'.ID_NAME.'.log', //终端输出
-        'pidFile' => RUN_DIR . '/'.ID_NAME.'.pid',  //pid_file
+        'pidFile' => RUN_DIR . '/.'.ID_NAME.'.pid',  //pid_file
         'logFile' => RUN_DIR . '/'.ID_NAME.'.log', //日志文件 log_file
         'log_level' => 4,
-        'open_eof_check' => true,
-        'open_eof_split' => true,
-        'package_eof' => "\r\n"
+        'open_length_check' => true,
+        'package_length_func' => function ($buffer) { //自定义解析长度
+            if(substr($buffer, 0, 3)==='GET'){
+                $pos = \strpos($buffer, "\r\n\r\n");
+                if ($pos === false) {
+                    if ($recv_len = \strlen($buffer) >= 16384) { //url接受最大的长度为16384个字符
+                        return -1;
+                    }
+                    return 0;
+                }
+                return $pos + 4;
+            }
+            $pos = \strpos($buffer, "\n");
+            if ($pos === false) {
+                return 0;
+            }
+            return $pos + 1;
+        },
+        'package_max_length'=>MAX_INPUT_SIZE, //64k
     ],
     'event' => [
         'onWorkerStart' => function ($worker, $worker_id) {
@@ -82,7 +100,6 @@ $conf = [
             if (!$isSwoole) {
                 $fd = $con->id;
             }
-            \SrvBase::$isConsole && SrvBase::safeEcho('onConnect '.$fd.PHP_EOL);
 
             if(!\MyId\IdLib::auth($con, $fd)){
                 \MyId\IdLib::toClose($con, $fd);
@@ -95,7 +112,7 @@ $conf = [
             \MyId\IdLib::auth($con, $fd, false);
             \SrvBase::$isConsole && SrvBase::safeEcho(date("Y-m-d H:i:s ").microtime(true).' onClose '.$fd.PHP_EOL);
         },
-        'onReceive' => function (swoole_server $server, int $fd, int $reactor_id, string $data) { //swoole tcp
+        'onReceive' => function (swoole_server $server, int $fd, int $reactor_id, string $data) { //swoole
             $data = \MyId\IdPackEof::decode($data);
             $ret = \MyId\IdServerIncr::onReceive($server, $data, $fd);
             $server->send($fd, \MyId\IdPackEof::encode($ret !== false ? $ret : \MyId\IdServerIncr::err()));
@@ -121,7 +138,8 @@ $conf = [
 if ($isSwoole) {
     $srv = new SwooleSrv($conf);
 } else {
+    // 设置每个连接接收的数据包最大为64K
+    \Workerman\Connection\TcpConnection::$defaultMaxPackageSize = MAX_INPUT_SIZE;
     $srv = new WorkerManSrv($conf);
 }
-
 $srv->run($argv);
