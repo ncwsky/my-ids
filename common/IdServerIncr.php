@@ -133,7 +133,7 @@ class IdServerIncr
         }
 
         \SrvBase::$isConsole && \SrvBase::safeEcho($recv . PHP_EOL);
-        \Log::trace($recv);
+        //\Log::trace($recv);
 
         return static::handle($con, $recv, $fd);
     }
@@ -184,7 +184,7 @@ class IdServerIncr
     }
 
     /**
-     * @param \Workerman\Connection\TcpConnection|\swoole_server $con
+     * @param \Workerman\Connection\TcpConnection $con
      * @param $url
      * @param int $fd
      * @return string
@@ -225,6 +225,13 @@ class IdServerIncr
 
         return static::httpSend($con, $fd, $ret);
     }
+
+    /**
+     * @param \Workerman\Connection\TcpConnection $con
+     * @param int $fd
+     * @param false|string $ret
+     * @return string
+     */
     protected static function httpSend($con, $fd, $ret){
         $code = 200;
         $reason = 'OK';
@@ -236,12 +243,7 @@ class IdServerIncr
 
         $body_len = strlen($ret);
         $out = "HTTP/1.1 {$code} $reason\r\nServer: my-id\r\nContent-Type: text/html;charset=utf-8\r\nContent-Length: {$body_len}\r\nConnection: keep-alive\r\n\r\n{$ret}";
-        if (\SrvBase::$instance->isWorkerMan) {
-            $con->close($out);
-        } else {
-            $con->send($fd, \MyId\IdPackEof::encode($out));
-            $con->close($fd);
-        }
+        $con->close($out);
         return '';
     }
 
