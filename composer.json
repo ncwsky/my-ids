@@ -1,9 +1,9 @@
 {
-    "name": "myphps/my-id",
-    "description": "id生成服务",
+    "name": "myphps/my-ids",
+    "description": "基于workerman的多进程id生成服务",
     "license": "MIT",
     "keywords": ["id"],
-    "homepage": "https://github.com/ncwsky/my-id",
+    "homepage": "https://github.com/ncwsky/my-ids",
     "minimum-stability": "dev",
     "require": {
         "php": ">=7.0",

@@ -32,7 +32,7 @@ class IdLib
     private static $authKey = '';
     private static $authFd = [];
     /**
-     * @var IdFile
+     * @var IdDb
      */
     private static $idObj;
 
@@ -85,11 +85,7 @@ class IdLib
     public static function onWorkerStart($worker, $worker_id)
     {
         self::$authKey = GetC('auth_key');
-        if (GetC('db.name')) {
-            self::$idObj = new IdDb();
-        } else {
-            self::$idObj = new IdFile();
-        }
+        self::$idObj = new IdDb();
         self::$idObj->init();
 
         //n ms实时数据落地
@@ -112,7 +108,7 @@ class IdLib
 
     /**
      * 处理数据
-     * @param TcpConnection $con
+     * @param TcpConnection|\swoole_server $con
      * @param string $recv
      * @param int $fd
      * @return bool|array
@@ -145,7 +141,7 @@ class IdLib
 
     /**
      * tcp 认证
-     * @param TcpConnection $con
+     * @param TcpConnection|\swoole_server $con
      * @param $fd
      * @param string $recv
      * @return bool|string
@@ -183,7 +179,7 @@ class IdLib
                 //\SrvBase::$isConsole && \SrvBase::safeEcho('auth timeout to close ' . $fd . '-'. self::$authFd[$fd] . PHP_EOL);
                 //\Log::write('auth timeout to close ' . $fd . '-'. self::$authFd[$fd],'xx');
                 unset(self::$authFd[$fd]);
-                $con->close();
+                self::toClose($con, $fd);
             });
         }
         return true;
@@ -200,7 +196,7 @@ class IdLib
     }
 
     /**
-     * @param TcpConnection $con
+     * @param TcpConnection|\swoole_server $con
      * @param string $recv
      * @param int $fd
      * @return array|bool|false|string
@@ -210,7 +206,7 @@ class IdLib
         //认证处理
         $authRet = self::auth($con, $fd, $recv);
         if (!$authRet) {
-            $con->close(self::err());
+            self::toClose($con, $fd, self::err());
             return false;
         }
         if($authRet==='ok'){
@@ -250,7 +246,7 @@ class IdLib
     }
 
     /**
-     * @param \Workerman\Connection\TcpConnection $con
+     * @param TcpConnection|\swoole_server $con
      * @param $url
      * @param int $fd
      * @return string
@@ -259,7 +255,7 @@ class IdLib
     private static function httpGetHandle($con, $url, $fd=0){
         if (!$url) {
             self::err('URL read failed');
-            return self::httpSend($con, false);
+            return self::httpSend($con, false, $fd);
         }
         $parse = parse_url($url);
         $data = [];
@@ -270,7 +266,7 @@ class IdLib
 
         //认证处理
         if (!self::httpAuth($fd, $data['key']??'')) {
-            return self::httpSend($con, false);
+            return self::httpSend($con, false, $fd);
         }
 
         $ret = 'ok'; //默认返回信息
@@ -292,15 +288,16 @@ class IdLib
                 $ret = false;
         }
 
-        return self::httpSend($con, $ret);
+        return self::httpSend($con, $ret, $fd);
     }
 
     /**
-     * @param \Workerman\Connection\TcpConnection $con
+     * @param TcpConnection|\swoole_server $con
      * @param false|string $ret
+     * @param int $fd
      * @return string
      */
-    private static function httpSend($con, $ret){
+    private static function httpSend($con, $ret, $fd){
         $code = 200;
         $reason = 'OK';
         if ($ret === false) {
@@ -311,7 +308,31 @@ class IdLib
 
         $body_len = strlen($ret);
         $out = "HTTP/1.1 {$code} $reason\r\nServer: my-id\r\nContent-Type: text/html;charset=utf-8\r\nContent-Length: {$body_len}\r\nConnection: keep-alive\r\n\r\n{$ret}";
-        $con->close($out);
+        self::toClose($con, $fd, $out);
         return '';
+    }
+
+    /**
+     * @param \Workerman\Connection\TcpConnection|\swoole_server $con
+     * @param int $fd
+     * @param string $msg
+     */
+    public static function toClose($con, $fd=0, $msg=null){
+        if (\SrvBase::$instance->isWorkerMan) {
+            $con->close($msg);
+        } else {
+            if ($msg) $con->send($fd, $msg);
+            $con->close($fd);
+        }
+    }
+
+    /**
+     * @param \Workerman\Connection\TcpConnection|\swoole_server $con
+     * @param int $fd
+     * @param string $msg
+     * @return bool|null
+     */
+    public static function toSend($con, $fd, $msg){
+        return \SrvBase::$instance->isWorkerMan ? $con->send($msg) : $con->send($fd, $msg);
     }
 }
